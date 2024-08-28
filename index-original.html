@@ -1,11 +1,16 @@
+<!-- Tree Render 
+    - click and drag from a node to create a child.
+    - double click a node to collapse all its children recrusively.
+ -->
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Expanding Node Tree with Collapse Feature</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #1a1a1a; touch-action: none; }
+        body { margin: 0; overflow: hidden; background-color: #1a1a1a; }
         svg { width: 100vw; height: 100vh; }
         .node { cursor: pointer; }
     </style>
@@ -21,7 +26,6 @@
         const colors = ['#4CAF50', '#2196F3', '#FFC107', '#E91E63', '#9C27B0', '#FF5722'];
         let isDragging = false;
         let startX, startY, activeNode, activeNodeX, activeNodeY, activeNodeGeneration;
-        const allNodes = []; // Store all nodes for reference
 
         function createNode(x, y, parentX, parentY, generation, parent) {
             nodeId++;
@@ -62,7 +66,6 @@
             });
 
             const nodeData = { group, circle, line, x, y, generation, children: [], parent, isCollapsed: false };
-            allNodes.push(nodeData); // Store the node data
 
             group.addEventListener('mousedown', (event) => {
                 isDragging = true;
@@ -118,7 +121,7 @@
             if (isDragging && activeNode) {
                 const dx = event.clientX - startX;
                 const dy = event.clientY - startY;
-                if (Math.sqrt(dx * dx + dy * dy) > 20) {  // Minimum drag distance
+                if (Math.sqrt(dx*dx + dy*dy) > 20) {  // Minimum drag distance
                     const angle = Math.atan2(dy, dx);
                     const distance = 100;
                     const newX = activeNodeX + Math.cos(angle) * distance;
@@ -135,66 +138,6 @@
             isDragging = false;
             activeNode = null;
         });
-
-        // Touch event handlers
-        svg.addEventListener('touchstart', handleTouchStart, false);
-        svg.addEventListener('touchmove', handleTouchMove, false);
-        svg.addEventListener('touchend', handleTouchEnd, false);
-
-        let lastTap = 0;
-
-        function handleTouchStart(event) {
-            event.preventDefault();
-            const touch = event.touches[0];
-            startX = touch.clientX;
-            startY = touch.clientY;
-            const element = document.elementFromPoint(startX, startY);
-            if (element && element.parentNode.classList.contains('node')) {
-                activeNode = getNodeDataFromElement(element.parentNode);
-                activeNodeX = activeNode.x;
-                activeNodeY = activeNode.y;
-                activeNodeGeneration = activeNode.generation;
-            }
-
-            // Detect double tap for collapsing
-            const currentTime = new Date().getTime();
-            const tapLength = currentTime - lastTap;
-            if (tapLength < 300 && tapLength > 0) {
-                event.preventDefault();
-                if (activeNode) {
-                    toggleCollapse(activeNode);
-                }
-            }
-            lastTap = currentTime;
-        }
-
-        function handleTouchMove(event) {
-            if (activeNode) {
-                event.preventDefault();
-                const touch = event.touches[0];
-                const dx = touch.clientX - startX;
-                const dy = touch.clientY - startY;
-                if (Math.sqrt(dx * dx + dy * dy) > 20) {  // Minimum drag distance
-                    const angle = Math.atan2(dy, dx);
-                    const distance = 80; // Slightly smaller distance for mobile
-                    const newX = activeNodeX + Math.cos(angle) * distance;
-                    const newY = activeNodeY + Math.sin(angle) * distance;
-                    const newNode = createNode(newX, newY, activeNodeX, activeNodeY, activeNodeGeneration + 1, activeNode);
-                    activeNode.children.push(newNode);
-                    activeNode = null;
-                }
-            }
-        }
-
-        function handleTouchEnd(event) {
-            activeNode = null;
-        }
-
-        function getNodeDataFromElement(element) {
-            // Helper function to get node data from SVG element
-            const id = element.getAttribute('id');
-            return allNodes.find(node => node.group.id === id);
-        }
 
         // Create the root node
         const rootNode = createNode(window.innerWidth / 2, window.innerHeight / 2, undefined, undefined, 0, null);
