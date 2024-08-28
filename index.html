@@ -137,17 +137,6 @@
             activeNode = null;
         }
 
-        function handleDoubleTap(event) {
-            event.preventDefault();
-            const clientX = event.clientX || event.touches[0].clientX;
-            const clientY = event.clientY || event.touches[0].clientY;
-            const element = document.elementFromPoint(clientX, clientY);
-            if (element && element.parentNode.classList.contains('node')) {
-                const nodeData = getNodeDataFromElement(element.parentNode);
-                toggleCollapse(nodeData);
-            }
-        }
-
         function getNodeDataFromElement(element) {
             const id = element.getAttribute('id');
             return allNodes.find(node => node.group.id === id);
@@ -163,14 +152,24 @@
 
         // Double tap/click detection
         let lastTap = 0;
-        svg.addEventListener('click', (event) => {
+        svg.addEventListener('touchend', handleDoubleTap);
+        svg.addEventListener('dblclick', handleDoubleTap);
+
+        function handleDoubleTap(event) {
+            event.preventDefault();
             const currentTime = new Date().getTime();
             const tapLength = currentTime - lastTap;
             if (tapLength < 300 && tapLength > 0) {
-                handleDoubleTap(event);
+                const clientX = event.clientX || (event.changedTouches && event.changedTouches[0].clientX);
+                const clientY = event.clientY || (event.changedTouches && event.changedTouches[0].clientY);
+                const element = document.elementFromPoint(clientX, clientY);
+                if (element && element.parentNode.classList.contains('node')) {
+                    const nodeData = getNodeDataFromElement(element.parentNode);
+                    toggleCollapse(nodeData);
+                }
             }
             lastTap = currentTime;
-        });
+        }
 
         // Create the root node
         const rootNode = createNode(window.innerWidth / 2, window.innerHeight / 2, undefined, undefined, 0, null);
