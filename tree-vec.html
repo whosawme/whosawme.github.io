@@ -1,0 +1,149 @@
+<!-- Tree Render 
+    - click and drag from a node to create a child.
+    - double click a node to collapse all its children recrusively.
+ -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expanding Node Tree with Collapse Feature</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #1a1a1a; }
+        svg { width: 100vw; height: 100vh; }
+        .node { cursor: pointer; }
+    </style>
+</head>
+<body>
+    <svg id="tree"></svg>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script>
+        const svg = document.getElementById('tree');
+        const nodeRadius = 20;
+        let nodeId = 0;
+        const colors = ['#4CAF50', '#2196F3', '#FFC107', '#E91E63', '#9C27B0', '#FF5722'];
+        let isDragging = false;
+        let startX, startY, activeNode, activeNodeX, activeNodeY, activeNodeGeneration;
+
+        function createNode(x, y, parentX, parentY, generation, parent) {
+            nodeId++;
+            const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            group.setAttribute('class', 'node');
+            group.setAttribute('id', `node-${nodeId}`);
+
+            let line;
+            if (parentX !== undefined && parentY !== undefined) {
+                line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', parentX);
+                line.setAttribute('y1', parentY);
+                line.setAttribute('x2', x);
+                line.setAttribute('y2', y);
+                line.setAttribute('stroke', 'white');
+                svg.appendChild(line);
+
+                gsap.from(line, {
+                    attr: { x2: parentX, y2: parentY },
+                    duration: 0.5,
+                    ease: 'power2.out'
+                });
+            }
+
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('cx', x);
+            circle.setAttribute('cy', y);
+            circle.setAttribute('r', nodeRadius);
+            circle.setAttribute('fill', colors[generation % colors.length]);
+
+            group.appendChild(circle);
+            svg.appendChild(group);
+
+            gsap.from(circle, {
+                attr: { r: 0 },
+                duration: 0.5,
+                ease: 'back.out(1.7)'
+            });
+
+            const nodeData = { group, circle, line, x, y, generation, children: [], parent, isCollapsed: false };
+
+            group.addEventListener('mousedown', (event) => {
+                isDragging = true;
+                startX = event.clientX;
+                startY = event.clientY;
+                activeNode = nodeData;
+                activeNodeX = x;
+                activeNodeY = y;
+                activeNodeGeneration = generation;
+                event.stopPropagation();
+            });
+
+            group.addEventListener('dblclick', (event) => {
+                event.stopPropagation();
+                toggleCollapse(nodeData);
+            });
+
+            return nodeData;
+        }
+
+        function toggleCollapse(nodeData) {
+            nodeData.isCollapsed = !nodeData.isCollapsed;
+            if (nodeData.isCollapsed) {
+                collapseNode(nodeData);
+            } else {
+                expandNode(nodeData);
+            }
+        }
+
+        function collapseNode(nodeData) {
+            nodeData.children.forEach(child => {
+                gsap.to(child.circle, { attr: { r: 0 }, duration: 0.3 });
+                gsap.to(child.line, { opacity: 0, duration: 0.3 });
+                child.group.style.pointerEvents = 'none';
+                if (!child.isCollapsed) {
+                    collapseNode(child);
+                }
+            });
+        }
+
+        function expandNode(nodeData) {
+            nodeData.children.forEach(child => {
+                gsap.to(child.circle, { attr: { r: nodeRadius }, duration: 0.3 });
+                gsap.to(child.line, { opacity: 1, duration: 0.3 });
+                child.group.style.pointerEvents = 'auto';
+                if (!child.isCollapsed) {
+                    expandNode(child);
+                }
+            });
+        }
+
+        document.addEventListener('mousemove', (event) => {
+            if (isDragging && activeNode) {
+                const dx = event.clientX - startX;
+                const dy = event.clientY - startY;
+                if (Math.sqrt(dx*dx + dy*dy) > 20) {  // Minimum drag distance
+                    const angle = Math.atan2(dy, dx);
+                    const distance = 100;
+                    const newX = activeNodeX + Math.cos(angle) * distance;
+                    const newY = activeNodeY + Math.sin(angle) * distance;
+                    const newNode = createNode(newX, newY, activeNodeX, activeNodeY, activeNodeGeneration + 1, activeNode);
+                    activeNode.children.push(newNode);
+                    isDragging = false;
+                    activeNode = null;
+                }
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+            activeNode = null;
+        });
+
+        // Create the root node
+        const rootNode = createNode(window.innerWidth / 2, window.innerHeight / 2, undefined, undefined, 0, null);
+
+        // Prevent dragging from creating unwanted selections
+        document.addEventListener('selectstart', (e) => e.preventDefault());
+    </script>
+</body>
+</html>
