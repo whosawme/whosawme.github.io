@@ -21,7 +21,7 @@
         const colors = ['#4CAF50', '#2196F3', '#FFC107', '#E91E63', '#9C27B0', '#FF5722'];
         let isDragging = false;
         let startX, startY, activeNode, activeNodeX, activeNodeY, activeNodeGeneration;
-        const allNodes = []; // Store all nodes for reference
+        const allNodes = [];
 
         function createNode(x, y, parentX, parentY, generation, parent) {
             nodeId++;
@@ -62,23 +62,7 @@
             });
 
             const nodeData = { group, circle, line, x, y, generation, children: [], parent, isCollapsed: false };
-            allNodes.push(nodeData); // Store the node data
-
-            group.addEventListener('mousedown', (event) => {
-                isDragging = true;
-                startX = event.clientX;
-                startY = event.clientY;
-                activeNode = nodeData;
-                activeNodeX = x;
-                activeNodeY = y;
-                activeNodeGeneration = generation;
-                event.stopPropagation();
-            });
-
-            group.addEventListener('dblclick', (event) => {
-                event.stopPropagation();
-                toggleCollapse(nodeData);
-            });
+            allNodes.push(nodeData);
 
             return nodeData;
         }
@@ -97,9 +81,7 @@
                 gsap.to(child.circle, { attr: { r: 0 }, duration: 0.3 });
                 gsap.to(child.line, { opacity: 0, duration: 0.3 });
                 child.group.style.pointerEvents = 'none';
-                if (!child.isCollapsed) {
-                    collapseNode(child);
-                }
+                collapseNode(child);
             });
         }
 
@@ -114,10 +96,29 @@
             });
         }
 
-        document.addEventListener('mousemove', (event) => {
+        function handleStart(event) {
+            event.preventDefault();
+            const clientX = event.clientX || event.touches[0].clientX;
+            const clientY = event.clientY || event.touches[0].clientY;
+            startX = clientX;
+            startY = clientY;
+            const element = document.elementFromPoint(clientX, clientY);
+            if (element && element.parentNode.classList.contains('node')) {
+                activeNode = getNodeDataFromElement(element.parentNode);
+                activeNodeX = activeNode.x;
+                activeNodeY = activeNode.y;
+                activeNodeGeneration = activeNode.generation;
+                isDragging = true;
+            }
+        }
+
+        function handleMove(event) {
             if (isDragging && activeNode) {
-                const dx = event.clientX - startX;
-                const dy = event.clientY - startY;
+                event.preventDefault();
+                const clientX = event.clientX || event.touches[0].clientX;
+                const clientY = event.clientY || event.touches[0].clientY;
+                const dx = clientX - startX;
+                const dy = clientY - startY;
                 if (Math.sqrt(dx * dx + dy * dy) > 20) {  // Minimum drag distance
                     const angle = Math.atan2(dy, dx);
                     const distance = 100;
@@ -129,78 +130,53 @@
                     activeNode = null;
                 }
             }
-        });
+        }
 
-        document.addEventListener('mouseup', () => {
+        function handleEnd(event) {
             isDragging = false;
             activeNode = null;
-        });
+        }
 
-        // Touch event handlers
-        svg.addEventListener('touchstart', handleTouchStart, false);
-        svg.addEventListener('touchmove', handleTouchMove, false);
-        svg.addEventListener('touchend', handleTouchEnd, false);
-
-        let lastTap = 0;
-
-        function handleTouchStart(event) {
+        function handleDoubleTap(event) {
             event.preventDefault();
-            const touch = event.touches[0];
-            startX = touch.clientX;
-            startY = touch.clientY;
-            const element = document.elementFromPoint(startX, startY);
+            const clientX = event.clientX || event.touches[0].clientX;
+            const clientY = event.clientY || event.touches[0].clientY;
+            const element = document.elementFromPoint(clientX, clientY);
             if (element && element.parentNode.classList.contains('node')) {
-                activeNode = getNodeDataFromElement(element.parentNode);
-                activeNodeX = activeNode.x;
-                activeNodeY = activeNode.y;
-                activeNodeGeneration = activeNode.generation;
+                const nodeData = getNodeDataFromElement(element.parentNode);
+                toggleCollapse(nodeData);
             }
-
-            // Detect double tap for collapsing
-            const currentTime = new Date().getTime();
-            const tapLength = currentTime - lastTap;
-            if (tapLength < 300 && tapLength > 0) {
-                event.preventDefault();
-                if (activeNode) {
-                    toggleCollapse(activeNode);
-                }
-            }
-            lastTap = currentTime;
-        }
-
-        function handleTouchMove(event) {
-            if (activeNode) {
-                event.preventDefault();
-                const touch = event.touches[0];
-                const dx = touch.clientX - startX;
-                const dy = touch.clientY - startY;
-                if (Math.sqrt(dx * dx + dy * dy) > 20) {  // Minimum drag distance
-                    const angle = Math.atan2(dy, dx);
-                    const distance = 80; // Slightly smaller distance for mobile
-                    const newX = activeNodeX + Math.cos(angle) * distance;
-                    const newY = activeNodeY + Math.sin(angle) * distance;
-                    const newNode = createNode(newX, newY, activeNodeX, activeNodeY, activeNodeGeneration + 1, activeNode);
-                    activeNode.children.push(newNode);
-                    activeNode = null;
-                }
-            }
-        }
-
-        function handleTouchEnd(event) {
-            activeNode = null;
         }
 
         function getNodeDataFromElement(element) {
-            // Helper function to get node data from SVG element
             const id = element.getAttribute('id');
             return allNodes.find(node => node.group.id === id);
         }
 
+        // Event listeners for both mouse and touch events
+        svg.addEventListener('mousedown', handleStart);
+        svg.addEventListener('touchstart', handleStart);
+        svg.addEventListener('mousemove', handleMove);
+        svg.addEventListener('touchmove', handleMove);
+        svg.addEventListener('mouseup', handleEnd);
+        svg.addEventListener('touchend', handleEnd);
+
+        // Double tap/click detection
+        let lastTap = 0;
+        svg.addEventListener('click', (event) => {
+            const currentTime = new Date().getTime();
+            const tapLength = currentTime - lastTap;
+            if (tapLength < 300 && tapLength > 0) {
+                handleDoubleTap(event);
+            }
+            lastTap = currentTime;
+        });
+
         // Create the root node
         const rootNode = createNode(window.innerWidth / 2, window.innerHeight / 2, undefined, undefined, 0, null);
 
-        // Prevent dragging from creating unwanted selections
-        document.addEventListener('selectstart', (e) => e.preventDefault());
+        // Prevent default touch behaviors
+        document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
     </script>
 </body>
 </html>
