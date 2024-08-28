@@ -22,6 +22,8 @@
         let isDragging = false;
         let startX, startY, activeNode, activeNodeX, activeNodeY, activeNodeGeneration;
         const allNodes = [];
+        let lastTapTime = 0;
+        let lastTappedNode = null;
 
         function createNode(x, y, parentX, parentY, generation, parent) {
             nodeId++;
@@ -108,31 +110,58 @@
                 activeNodeX = activeNode.x;
                 activeNodeY = activeNode.y;
                 activeNodeGeneration = activeNode.generation;
-                isDragging = true;
+                
+                // Visual feedback
+                gsap.to(activeNode.circle, { 
+                    attr: { r: nodeRadius * 1.2 }, 
+                    duration: 0.2, 
+                    ease: 'power2.out' 
+                });
+
+                // Check for double tap
+                const currentTime = new Date().getTime();
+                const tapLength = currentTime - lastTapTime;
+                if (tapLength < 300 && tapLength > 0 && lastTappedNode === activeNode) {
+                    toggleCollapse(activeNode);
+                }
+                lastTapTime = currentTime;
+                lastTappedNode = activeNode;
             }
         }
 
         function handleMove(event) {
-            if (isDragging && activeNode) {
+            if (activeNode) {
                 event.preventDefault();
                 const clientX = event.clientX || event.touches[0].clientX;
                 const clientY = event.clientY || event.touches[0].clientY;
                 const dx = clientX - startX;
                 const dy = clientY - startY;
                 if (Math.sqrt(dx * dx + dy * dy) > 20) {  // Minimum drag distance
+                    isDragging = true;
                     const angle = Math.atan2(dy, dx);
                     const distance = 100;
                     const newX = activeNodeX + Math.cos(angle) * distance;
                     const newY = activeNodeY + Math.sin(angle) * distance;
                     const newNode = createNode(newX, newY, activeNodeX, activeNodeY, activeNodeGeneration + 1, activeNode);
                     activeNode.children.push(newNode);
-                    isDragging = false;
-                    activeNode = null;
+                    resetActiveNode();
                 }
             }
         }
 
         function handleEnd(event) {
+            if (activeNode && !isDragging) {
+                // Reset node size if not dragged
+                gsap.to(activeNode.circle, { 
+                    attr: { r: nodeRadius }, 
+                    duration: 0.2, 
+                    ease: 'power2.out' 
+                });
+            }
+            resetActiveNode();
+        }
+
+        function resetActiveNode() {
             isDragging = false;
             activeNode = null;
         }
@@ -149,27 +178,6 @@
         svg.addEventListener('touchmove', handleMove);
         svg.addEventListener('mouseup', handleEnd);
         svg.addEventListener('touchend', handleEnd);
-
-        // Double tap/click detection
-        let lastTap = 0;
-        svg.addEventListener('touchend', handleDoubleTap);
-        svg.addEventListener('dblclick', handleDoubleTap);
-
-        function handleDoubleTap(event) {
-            event.preventDefault();
-            const currentTime = new Date().getTime();
-            const tapLength = currentTime - lastTap;
-            if (tapLength < 300 && tapLength > 0) {
-                const clientX = event.clientX || (event.changedTouches && event.changedTouches[0].clientX);
-                const clientY = event.clientY || (event.changedTouches && event.changedTouches[0].clientY);
-                const element = document.elementFromPoint(clientX, clientY);
-                if (element && element.parentNode.classList.contains('node')) {
-                    const nodeData = getNodeDataFromElement(element.parentNode);
-                    toggleCollapse(nodeData);
-                }
-            }
-            lastTap = currentTime;
-        }
 
         // Create the root node
         const rootNode = createNode(window.innerWidth / 2, window.innerHeight / 2, undefined, undefined, 0, null);
