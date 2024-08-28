@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NodeTree</title>
+    <title>Node Tree with Text Input Feature</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #1a1a1a; touch-action: none; font-family: Arial, sans-serif; }
         svg { width: calc(100vw - 60px); height: 100vh; float: left; }
@@ -35,6 +35,21 @@
         #action-button.disabled {
             opacity: 0.5;
             cursor: default;
+        }
+        .text-input {
+            position: absolute;
+            background-color: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 5px;
+            font-size: 14px;
+            width: 150px;
+        }
+        .node-text {
+            fill: rgb(255, 255, 255);
+            font-size: 12px;
+            text-anchor: middle;
+            pointer-events: none;
         }
     </style>
 </head>
@@ -87,7 +102,13 @@
             circle.setAttribute('r', nodeRadius);
             circle.setAttribute('fill', colors[generation % colors.length]);
 
+            const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            text.setAttribute('class', 'node-text');
+            text.setAttribute('x', x);
+            text.setAttribute('y', y);
+
             group.appendChild(circle);
+            group.appendChild(text);
             svg.appendChild(group);
 
             gsap.from(circle, {
@@ -96,7 +117,7 @@
                 ease: 'back.out(1.7)'
             });
 
-            const nodeData = { group, circle, line, x, y, generation, children: [], parent, isCollapsed: false, isSelected: false };
+            const nodeData = { group, circle, line, text, x, y, generation, children: [], parent, isCollapsed: false, isSelected: false };
             allNodes.push(nodeData);
 
             return nodeData;
@@ -112,24 +133,26 @@
         }
 
         function collapseNode(nodeData) {
-            nodeData.children.forEach(child => {
-                gsap.to(child.circle, { attr: { r: 0 }, duration: 0.3 });
-                gsap.to(child.line, { opacity: 0, duration: 0.3 });
-                child.group.style.pointerEvents = 'none';
-                collapseNode(child);
-            });
-        }
+    nodeData.children.forEach(child => {
+        gsap.to(child.circle, { attr: { r: 0 }, duration: 0.3 });
+        gsap.to(child.line, { opacity: 0, duration: 0.3 });
+        gsap.to(child.text, { opacity: 0, duration: 0.3 }); // Hide the text
+        child.group.style.pointerEvents = 'none';
+        collapseNode(child);
+    });
+}
 
-        function expandNode(nodeData) {
-            nodeData.children.forEach(child => {
-                gsap.to(child.circle, { attr: { r: nodeRadius }, duration: 0.3 });
-                gsap.to(child.line, { opacity: 1, duration: 0.3 });
-                child.group.style.pointerEvents = 'auto';
-                if (!child.isCollapsed) {
-                    expandNode(child);
-                }
-            });
+function expandNode(nodeData) {
+    nodeData.children.forEach(child => {
+        gsap.to(child.circle, { attr: { r: nodeRadius }, duration: 0.3 });
+        gsap.to(child.line, { opacity: 1, duration: 0.3 });
+        gsap.to(child.text, { opacity: 1, duration: 0.3 }); // Show the text
+        child.group.style.pointerEvents = 'auto';
+        if (!child.isCollapsed) {
+            expandNode(child);
         }
+    });
+}
 
         function toggleNodeSelection(nodeData) {
             if (selectedNode && selectedNode !== nodeData) {
@@ -163,103 +186,135 @@
         }
 
         function handleStart(event) {
-            event.preventDefault();
-            const clientX = event.clientX || event.touches[0].clientX;
-            const clientY = event.clientY || event.touches[0].clientY;
-            startX = clientX;
-            startY = clientY;
-            const element = document.elementFromPoint(clientX, clientY);
-            if (element && element.parentNode.classList.contains('node')) {
-                activeNode = getNodeDataFromElement(element.parentNode);
-                activeNodeX = activeNode.x;
-                activeNodeY = activeNode.y;
-                activeNodeGeneration = activeNode.generation;
-                
-                // Visual feedback
-                gsap.to(activeNode.circle, { 
-                    attr: { r: nodeRadius * 1.2 }, 
-                    duration: 0.2, 
-                    ease: 'power2.out' 
-                });
-
-                // Check for double tap
-                const currentTime = new Date().getTime();
-                const tapLength = currentTime - lastTapTime;
-                if (tapLength < 300 && tapLength > 0 && lastTappedNode === activeNode) {
-                    toggleCollapse(activeNode);
-                } else {
-                    // Single tap
-                    toggleNodeSelection(activeNode);
-                }
-                lastTapTime = currentTime;
-                lastTappedNode = activeNode;
-            }
-        }
-
-        function handleMove(event) {
-            if (activeNode) {
-                event.preventDefault();
-                const clientX = event.clientX || event.touches[0].clientX;
-                const clientY = event.clientY || event.touches[0].clientY;
-                const dx = clientX - startX;
-                const dy = clientY - startY;
-                if (Math.sqrt(dx * dx + dy * dy) > 20) {  // Minimum drag distance
-                    isDragging = true;
-                    const angle = Math.atan2(dy, dx);
-                    const distance = 100;
-                    const newX = activeNodeX + Math.cos(angle) * distance;
-                    const newY = activeNodeY + Math.sin(angle) * distance;
-                    const newNode = createNode(newX, newY, activeNodeX, activeNodeY, activeNodeGeneration + 1, activeNode);
-                    activeNode.children.push(newNode);
-                    resetActiveNode();
-                }
-            }
-        }
-
-        function handleEnd(event) {
-            if (activeNode && !isDragging) {
-                // Reset node size if not dragged
-                gsap.to(activeNode.circle, { 
-                    attr: { r: nodeRadius }, 
-                    duration: 0.2, 
-                    ease: 'power2.out' 
-                });
-            }
-            resetActiveNode();
-        }
-
-        function resetActiveNode() {
-            isDragging = false;
-            activeNode = null;
-        }
-
-        function getNodeDataFromElement(element) {
-            const id = element.getAttribute('id');
-            return allNodes.find(node => node.group.id === id);
-        }
-
-        // Event listeners for both mouse and touch events
-        svg.addEventListener('mousedown', handleStart);
-        svg.addEventListener('touchstart', handleStart);
-        svg.addEventListener('mousemove', handleMove);
-        svg.addEventListener('touchmove', handleMove);
-        svg.addEventListener('mouseup', handleEnd);
-        svg.addEventListener('touchend', handleEnd);
-
-        // Action button click handler
-        actionButton.addEventListener('click', function() {
-            if (selectedNode) {
-                // Perform action on selected node
-                console.log('Action performed on node:', selectedNode);
-                // Add your action logic here
-            }
+    event.preventDefault();
+    const clientX = event.clientX || event.touches[0].clientX;
+    const clientY = event.clientY || event.touches[0].clientY;
+    startX = clientX;
+    startY = clientY;
+    const element = document.elementFromPoint(clientX, clientY);
+    if (element && element.parentNode.classList.contains('node')) {
+        activeNode = getNodeDataFromElement(element.parentNode);
+        activeNodeX = activeNode.x;
+        activeNodeY = activeNode.y;
+        activeNodeGeneration = activeNode.generation;
+        
+        // Visual feedback
+        gsap.to(activeNode.circle, { 
+            attr: { r: nodeRadius * 1.2 }, 
+            duration: 0.2, 
+            ease: 'power2.out' 
         });
 
-        // Create the root node
-        const rootNode = createNode(window.innerWidth / 2 - 30, window.innerHeight / 2, undefined, undefined, 0, null);
+        // Check for double tap
+        const currentTime = new Date().getTime();
+        const tapLength = currentTime - lastTapTime;
+        if (tapLength < 300 && tapLength > 0 && lastTappedNode === activeNode) {
+            toggleCollapse(activeNode);
+        } else {
+            // Single tap
+            toggleNodeSelection(activeNode);
+        }
+        lastTapTime = currentTime;
+        lastTappedNode = activeNode;
+    }
+}
 
-        // Prevent default touch behaviors
-        document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+function handleMove(event) {
+    if (activeNode) {
+        event.preventDefault();
+        const clientX = event.clientX || event.touches[0].clientX;
+        const clientY = event.clientY || event.touches[0].clientY;
+        const dx = clientX - startX;
+        const dy = clientY - startY;
+        if (Math.sqrt(dx * dx + dy * dy) > 20) {  // Minimum drag distance
+            isDragging = true;
+            const angle = Math.atan2(dy, dx);
+            const distance = 100;
+            const newX = activeNodeX + Math.cos(angle) * distance;
+            const newY = activeNodeY + Math.sin(angle) * distance;
+            const newNode = createNode(newX, newY, activeNodeX, activeNodeY, activeNodeGeneration + 1, activeNode);
+            activeNode.children.push(newNode);
+            resetActiveNode();
+        }
+    }
+}
+
+function handleEnd(event) {
+    if (activeNode && !isDragging) {
+        // Reset node size if not dragged
+        gsap.to(activeNode.circle, { 
+            attr: { r: nodeRadius }, 
+            duration: 0.2, 
+            ease: 'power2.out' 
+        });
+    }
+    resetActiveNode();
+}
+
+function resetActiveNode() {
+    isDragging = false;
+    activeNode = null;
+}
+
+function getNodeDataFromElement(element) {
+    const id = element.getAttribute('id');
+    return allNodes.find(node => node.group.id === id);
+}
+
+function createTextInput(x, y) {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'text-input';
+    input.style.left = `${x}px`;
+    input.style.top = `${y}px`;
+    document.body.appendChild(input);
+    input.focus();
+
+    input.addEventListener('keyup', function(event) {
+        if (event.key === 'Enter') {
+            const text = input.value.trim();
+            if (text) {
+                updateNodeText(selectedNode, text);
+            }
+            document.body.removeChild(input);
+        }
+    });
+
+    input.addEventListener('blur', function() {
+        document.body.removeChild(input);
+    });
+}
+
+function updateNodeText(nodeData, text) {
+    nodeData.text.textContent = text;
+    // Center the text
+    const bbox = nodeData.text.getBBox();
+    nodeData.text.setAttribute('y', nodeData.y + bbox.height / 4);
+}
+
+// Event listeners for both mouse and touch events
+svg.addEventListener('mousedown', handleStart);
+svg.addEventListener('touchstart', handleStart);
+svg.addEventListener('mousemove', handleMove);
+svg.addEventListener('touchmove', handleMove);
+svg.addEventListener('mouseup', handleEnd);
+svg.addEventListener('touchend', handleEnd);
+
+// Action button click handler
+actionButton.addEventListener('click', function() {
+    if (selectedNode) {
+        const rect = svg.getBoundingClientRect();
+        const x = selectedNode.x + rect.left;
+        const y = selectedNode.y + rect.top + nodeRadius + 5;
+        createTextInput(x, y);
+    }
+});
+
+// Create the root node
+const rootNode = createNode(window.innerWidth / 2 - 30, window.innerHeight / 2, undefined, undefined, 0, null);
+
+// Prevent default touch behaviors
+document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false }); // ... (rest of the code remains the same)
     </script>
 </body>
 </html>
