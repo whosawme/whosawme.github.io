@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Expanding Node Tree with Collapse Feature</title>
+    <title>Expanding Node Tree with Selection and Collapse Feature</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #1a1a1a; touch-action: none; }
         svg { width: 100vw; height: 100vh; }
@@ -24,6 +24,7 @@
         const allNodes = [];
         let lastTapTime = 0;
         let lastTappedNode = null;
+        let selectedNode = null;
 
         function createNode(x, y, parentX, parentY, generation, parent) {
             nodeId++;
@@ -63,7 +64,7 @@
                 ease: 'back.out(1.7)'
             });
 
-            const nodeData = { group, circle, line, x, y, generation, children: [], parent, isCollapsed: false };
+            const nodeData = { group, circle, line, x, y, generation, children: [], parent, isCollapsed: false, isSelected: false };
             allNodes.push(nodeData);
 
             return nodeData;
@@ -98,6 +99,35 @@
             });
         }
 
+        function toggleNodeSelection(nodeData) {
+            if (selectedNode && selectedNode !== nodeData) {
+                // Deselect the previously selected node
+                selectedNode.isSelected = false;
+                gsap.to(selectedNode.circle, { 
+                    stroke: 'none', 
+                    strokeWidth: 0,
+                    duration: 0.2 
+                });
+            }
+
+            nodeData.isSelected = !nodeData.isSelected;
+            if (nodeData.isSelected) {
+                selectedNode = nodeData;
+                gsap.to(nodeData.circle, { 
+                    stroke: 'white', 
+                    strokeWidth: 3,
+                    duration: 0.2 
+                });
+            } else {
+                selectedNode = null;
+                gsap.to(nodeData.circle, { 
+                    stroke: 'none', 
+                    strokeWidth: 0,
+                    duration: 0.2 
+                });
+            }
+        }
+
         function handleStart(event) {
             event.preventDefault();
             const clientX = event.clientX || event.touches[0].clientX;
@@ -123,6 +153,9 @@
                 const tapLength = currentTime - lastTapTime;
                 if (tapLength < 300 && tapLength > 0 && lastTappedNode === activeNode) {
                     toggleCollapse(activeNode);
+                } else {
+                    // Single tap
+                    toggleNodeSelection(activeNode);
                 }
                 lastTapTime = currentTime;
                 lastTappedNode = activeNode;
